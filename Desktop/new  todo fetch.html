@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <style>
+        body {
+            background-color: skyblue;
+        }
+        .box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 600px;
+            margin: 48px auto 0;
+        }
+
+        .note__item:not(:last-child) {
+            margin-bottom: 24px;
+        }
+        .note__item--completed {
+            text-decoration: line-through;
+            color: grey;
+        }
+        .hidden {
+            display: none;
+        }
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: right;
+            width: 250px;
+        }
+        
+    </style>
+    <div class="box">
+        <form class="login">
+            <input type="text" placeholder="id" class="form_input">
+            <button type="submit">submit</button>
+        </form>
+        <form class="note">
+            <p>Add task</p>
+            <input type="text" placeholder="task" class="form_task">
+            <button>add</button>
+        </form>
+        <ul class="note_list"></ul>
+    </div>
+    <script>
+        const Todo = function (form,list,template){ 
+            this.form = form;
+            this.list = list;
+            this.template = template;
+            this.notes = [];
+           
+            
+        }
+        //сохранение
+        Todo.prototype.save = function() {
+            localStorage.setItem('notes',JSON.stringify(this.notes))
+        };
+
+        // completed
+        Todo.prototype.complete = function(id){
+            
+           
+            this.notes.find(note => {
+               note._id === id
+                
+            
+                fetch(`https://todo.hillel.it/todo/${note._id}/toggle`,{
+                    method:'PUT',
+                    headers: {
+                      'Content-Type':'application/json',
+                      'Authorization':`Bearer ${localStorage.getItem('access_token')}`
+                    }
+                })
+                .then(result => result.json())
+                .then(note => console.log(note.checked))
+               
+            })
+            console.log(note.checked);
+            
+                  
+        } 
+              
+        
+           
+        
+        //remove
+        // Todo.prototype.remove = function(){
+        //     this.notes.filter(note => note._id !== _id);
+        // }
+
+        //рендеринг
+        Todo.prototype.render = function() {
+            this.list.innerHTML = '';
+
+            this.notes.forEach(note => {
+                this.list.insertAdjacentHTML(
+                'afterbegin',
+                this.template(note)
+                );
+            });
+        };
+
+        Todo.prototype.append = function (note) {
+            const task = {
+                value: note,
+                priority: 1
+            };
+            const options = {
+                method:'POST',
+                body:JSON.stringify(task),
+                headers:{
+                    'Content-Type':'application/json',
+                    'Authorization':`Bearer ${localStorage.getItem('access_token')}`
+                }
+            }
+        
+        fetch('https://todo.hillel.it/todo',options)
+        .then(response => response.json())
+        .then(note =>{
+             console.log(note)
+             console.log(note._id);
+             
+             this.notes.push(note);
+             this.render();
+             this.save();
+             this.form.reset();
+
+             })
+        .catch(error=>alert('sorry, shit happends POST !!!!'))
+        };
+        // добавляем нашу заметку на страницу 
+
+        
+
+        Todo.prototype.getAccess = function(id){
+            const options = {
+                method:'POST',
+                body:JSON.stringify({
+                value: id
+            }),
+                headers: {
+                    'Content-Type':'application/json'
+                }
+            }
+            fetch('https://todo.hillel.it/auth/login',options)
+                .then(response => response.json())
+                .then(result => {
+                //console.log(result);     
+                localStorage.setItem('access_token',result.access_token)
+                    this.getTask()
+                })
+                .catch(error => alert('sorry, shit happends'))
+        };
+
+        //забираем задачу с сервера "GET"
+        Todo.prototype.getTask = function(){
+            const options = {
+                method: 'GET',
+                headers: {
+                    'Content-Type':'application/json',
+                    'Authorization':`Bearer ${localStorage.getItem('access_token')}`
+                }
+            }
+            fetch('https://todo.hillel.it/todo',options)
+                .then(response=>response.json())
+                .then(result =>{
+                console.log(result)
+                this.result = notes;
+                this.render()
+                })
+                //.catch(error => alert('Ooops..GET'))
+
+        };
+        //  добавление закладки на страницу
+         Todo.prototype.init = function() {
+             //если нет авторизации 
+            const token = localStorage.getItem('access_token');
+            
+             if(token){
+
+                this.form.addEventListener('submit',e =>{
+                    e.preventDefault();
+                    const note = document.querySelector('.form_task').value;
+                    console.log(note);
+                    this.append(note);
+                
+                });
+            } else {
+                alert('write your id')
+            };
+
+
+            //события для трех кнопок
+
+            this.list.addEventListener('click',({target}) => {
+               
+                const isCompleteBtn = target.tagName === 'BUTTON' && target.classList.contains('note__button-done');
+                const editButton = target.tagName === 'BUTTON' && target.classList.contains('note__button--edit');
+                const currentNoteId = target.closest('li').dataset.id;
+
+
+        console.log(editButton);
+        console.log(currentNoteId);
+
+
+        if(isCompleteBtn) {
+
+            this.complete(currentNoteId);
+
+        } else if(editButton){
+
+            this.edit(currentNoteId);
+
+        } else {
+            this.remove(currentNoteId);
+        }
+
+        this.render();
+        this.save();
+    });
+
+    const saveData = JSON.parse(localStorage.getItem(this.notes));
+
+    if(saveData) {
+        this.notes = saveData;
+        this.render();
+    }
+
+        };
+
+        const example = new Todo(
+            document.querySelector('.note'),
+            document.querySelector('.note_list'),
+            note=>`
+            <li data-id="${note._id}" class="note__item ${note.checked ? `note__item--completed`:' '}" >
+            <span class="note__text"> ${note.value}</span>   
+            <button class="note__button note__button-done"${note.checked && 'disabled'} data-action ="done">DONE</button>
+            <button class="note__button note__button--remove" data-action = "remove">Remove</button>
+            <button class="note__button note__button--edit" data-action = "edit">EDIT</button>
+            </li>`
+        );
+        //Форма регистрации на сайте  
+        const login = document.querySelector('.login').addEventListener('submit', e => {
+            e.preventDefault();
+            console.log('qwe');
+            const id = document.querySelector('.form_input').value;
+            console.log(typeof id);
+            
+            example.getAccess(id);
+                
+            });
+
+
+
+        example.init();
+        
+    
+        
+
+    </script>
+</body>
+</html>
